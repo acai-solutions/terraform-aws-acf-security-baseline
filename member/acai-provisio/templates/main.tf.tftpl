@@ -1,0 +1,67 @@
+# Retrieve the AWS account ID of the current AWS environment
+data "aws_caller_identity" "current" {}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# ¦ AWS SUPPORT ROLE
+# ---------------------------------------------------------------------------------------------------------------------
+resource "aws_iam_role" "aws_support_access_role_${lower(replace(primary_region, "-", "_"))}" {
+  name               = "AWS_Support_Access_Role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = {
+        AWS = "arn:aws:iam::$${data.aws_caller_identity.current.account_id}:root"  # The account ID of the AWS account you want to allow access
+      }
+    }]
+  })
+
+  tags = {
+    ${resource_tags}
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "aws_support_access_policy_${lower(replace(primary_region, "-", "_"))}" {
+  role       = aws_iam_role.aws_support_access_role_${lower(replace(primary_region, "-", "_"))}.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSSupportAccess"  
+}
+
+
+%{ if aws_security_hub_enabled == true ~}
+# ---------------------------------------------------------------------------------------------------------------------
+# ¦ AWS SECURITRY HUB
+# ---------------------------------------------------------------------------------------------------------------------
+resource "aws_securityhub_account" "security_hub_${lower(replace(primary_region, "-", "_"))}" {
+  enable_default_standards = ${aws_security_hub_enable_default_standards}
+  control_finding_generator = "${aws_security_hub_control_finding_generator}"
+  auto_enable_controls = ${aws_security_hub_auto_enable_controls}
+}
+
+%{ for region in secondary_regions ~}
+resource "aws_securityhub_account" "security_hub_${lower(replace(region, "-", "_"))}" {
+  enable_default_standards = ${aws_security_hub_enable_default_standards}
+  control_finding_generator = "${aws_security_hub_control_finding_generator}"
+  auto_enable_controls = ${aws_security_hub_auto_enable_controls}
+  provider = aws.${lower(replace(region, "-", "_"))}
+}
+
+%{ endfor ~}
+%{ endif ~}
+%{ if amazon_guardduty_enabled == true ~}
+# ---------------------------------------------------------------------------------------------------------------------
+# ¦ AMAZON GUARDDUTY
+# ---------------------------------------------------------------------------------------------------------------------
+resource "aws_guardduty_detector" "guardduty_${lower(replace(primary_region, "-", "_"))}" {
+  enable = true
+}
+
+%{ for region in secondary_regions ~}
+resource "aws_guardduty_detector" "guardduty_${lower(replace(region, "-", "_"))}" {
+  enable = true
+  provider = aws.${lower(replace(region, "-", "_"))}
+}
+
+%{ endfor ~}
+%{ endif ~}
+

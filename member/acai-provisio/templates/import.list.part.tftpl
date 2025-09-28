@@ -1,0 +1,15 @@
+%{ if aws_security_hub_enabled == true ~}
+module.${provisio_package_name}.aws_securityhub_account.security_hub_${lower(replace(primary_region, "-", "_"))} $${account_id}
+
+%{ for region in secondary_regions ~}
+module.${provisio_package_name}.aws_securityhub_account.security_hub_${lower(replace(region, "-", "_"))} $${account_id}
+%{ endfor ~}
+%{ endif ~}
+
+%{ if amazon_guardduty_enabled == true ~}
+module.${provisio_package_name}.aws_guardduty_detector.guardduty_${lower(replace(primary_region, "-", "_"))} $${detector_id_${lower(replace(primary_region, "-", "_"))}}
+
+%{ for region in secondary_regions ~}
+module.${provisio_package_name}.aws_guardduty_detector.guardduty_${lower(replace(region, "-", "_"))} $${detector_id_${lower(replace(region, "-", "_"))}}
+%{ endfor ~}
+%{ endif ~}
